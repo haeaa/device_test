@@ -15,10 +15,11 @@ MEASURE_INTERVAL = 5  # 5초 간격으로
 
 # 연결
 rm = pyvisa.ResourceManager()
-supply = rm.open_resource('')  #apt 장비 쓰기
+supply = rm.open_resource('COM5')  #apt 장비 쓰기
 
 # 초기화
 supply.write('*RST')
+time.sleep(1)
 supply.write('AR 0')  # Program mode
 
 results = []
