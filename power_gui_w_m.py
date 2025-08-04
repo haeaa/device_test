@@ -24,7 +24,7 @@ class DeviceConn:
         if not self.resource:
             return False
         try:
-            if self.resource.startswith("USB"):
+            if self.resource.startswith("USB") or "::" in self.resource:
                 self.conn = self.rm.open_resource(self.resource)
                 self.mode = "USB"
                 self.idn = self.conn.query("*IDN?").strip()
@@ -92,9 +92,10 @@ class PowerAnalyzerGUI:
 
         # 각 계측기: 주소, DeviceConn 오브젝트
         self.device_infos = {
-            "PowerMeter": {"label": "Power Meter 자원주소", "conn": None, "entry": None, "idn_var": tk.StringVar()},
-            "ElectronicLoad": {"label": "Electronic Load 자원주소", "conn": None, "entry": None, "idn_var": tk.StringVar()},
+            "PowerMeter": {"label": "Power Meter  자원주소", "conn": None, "entry": None, "idn_var": tk.StringVar()},
+            "ElectronicLoad": {"label": "Electronic ( Digital ) Load 자원주소", "conn": None, "entry": None, "idn_var": tk.StringVar()},
             "TempSensor": {"label": "온도센서 자원주소", "conn": None, "entry": None, "idn_var": tk.StringVar()},
+            "PowerSupply": {"label": "Power Supply 자원주소", "conn": None, "entry": None, "idn_var": tk.StringVar()},
         }
 
         self.build_gui()
