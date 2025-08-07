@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 import pyvisa
 import serial
 import socket
@@ -7,6 +7,7 @@ import threading
 import csv
 import time
 from datetime import datetime
+import os
 
 class PowerAnalyzerGUI:
     def __init__(self, root):
@@ -19,13 +20,14 @@ class PowerAnalyzerGUI:
         self.is_testing = False
         self.test_thread = None
         self.rm = pyvisa.ResourceManager()
+        self.save_folder = None
         self.build_gui()
 
     def build_gui(self):
         labels = ["Power Supply", "Electronic Load", "온도 센서", "Power Meter"]
         self.device_entries = {}
         for i, label in enumerate(labels):
-            tk.Label(self.root, text=label).grid(row=i, column=0)
+            tk.Label(self.root, text=label).grid(row3=i, column=0)
             entry = tk.Entry(self.root, width=40)
             entry.grid(row=i, column=1, columnspan=3)
             self.device_entries[label] = entry
@@ -33,7 +35,7 @@ class PowerAnalyzerGUI:
         self.connect_btn = tk.Button(self.root, text="장비 연결", command=self.connect_all)
         self.connect_btn.grid(row=0, column=4, rowspan=4, sticky="ns")
 
-        tk.Label(self.root, text="전압 시퀀스 설정 (V):").grid(row=4, column=0)
+        tk.Label(self.root, text="전압 시퀀스 (V):").grid(row=4, column=0)
         self.voltage_entry = tk.Entry(self.root, width=30)
         self.voltage_entry.grid(row=4, column=1)
         self.voltage_entry.insert(0, "60,90")
@@ -53,11 +55,14 @@ class PowerAnalyzerGUI:
         self.current_entry.grid(row=5, column=3)
         self.current_entry.insert(0, "11.0")
 
+        self.folder_btn = tk.Button(self.root, text="폴더 지정", command=self.select_folder)
+        self.folder_btn.grid(row=7, column=0)
+
         self.start_test_btn = tk.Button(self.root, text="테스트 시작", command=self.start_test)
-        self.start_test_btn.grid(row=7, column=0, columnspan=2)
+        self.start_test_btn.grid(row=7, column=1)
 
         self.stop_test_btn = tk.Button(self.root, text="테스트 정지", command=self.stop_test)
-        self.stop_test_btn.grid(row=7, column=2, columnspan=2)
+        self.stop_test_btn.grid(row=7, column=2)
 
         self.log_box = tk.Text(self.root, height=15, width=100)
         self.log_box.grid(row=8, column=0, columnspan=5)
@@ -132,6 +137,11 @@ class PowerAnalyzerGUI:
             self.log(f"{label} 쿼리 오류: {e}")
             return None
 
+    def select_folder(self):
+        self.save_folder = filedialog.askdirectory()
+        if self.save_folder:
+            self.log(f"저장 폴더 지정됨: {self.save_folder}")
+
     def start_test(self):
         if not self.instrument:
             self.log("연결된 장치가 없습니다.")
@@ -140,15 +150,12 @@ class PowerAnalyzerGUI:
 
         try:
             voltages = [float(v.strip()) for v in self.voltage_entry.get().split(",") if v.strip()]
-            if not voltages:
-                raise ValueError("전압 시퀀스를 입력하세요.")
             wait_time = float(self.wait_entry.get())
             sampling_interval = float(self.sampling_entry.get())
-            if wait_time <= 0 or sampling_interval <= 0:
-                raise ValueError("대기 시간과 샘플링 간격은 0보다 커야 합니다.")
             load_current = float(self.current_entry.get())
-            if load_current <= 0:
-                raise ValueError("부하 전류는 0보다 커야 합니다.")
+            if not self.save_folder:
+                messagebox.showwarning("경고", "저장 폴더가 지정되지 않았습니다.")
+                return
         except Exception as e:
             self.log(f"입력값 오류: {e}")
             messagebox.showerror("입력값 오류", str(e))
@@ -170,10 +177,12 @@ class PowerAnalyzerGUI:
 
     def open_log_file(self):
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        self.csv_file = open(f"result_{timestamp}.csv", "w", newline="")
+        filename = os.path.join(self.save_folder, f"result_{timestamp}.csv")
+        self.csv_file = open(filename, "w", newline="")
         self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(["Time", "Set_V", "Measured_V", "Current", "Power", "Temperature", "Supply_v", "PowerMeter"])
-        self.log("CSV 파일 생성 완료")
+        header = ["Time", "Set_V", "Measured_V", "Current", "Power", "Temperature", "Supply_v", "PowerMeter"]
+        self.csv_writer.writerow(header)
+        self.log(f"CSV 파일 생성 완료: {filename}")
 
     def run_test_sequence(self):
         try:
@@ -224,9 +233,9 @@ class PowerAnalyzerGUI:
                             if val is not None:
                                 temperature = float(val)
                         if load_label in self.instrument:
-                            val_v = self.query(load_label, ":MEAS:VOLT?") # 이거 필요 없을지도?
-                            val_c = self.query(load_label, ":MEAS:CURR?") # 이것도
-                            val_p = self.query(load_label, ":MEAS:POW?") # 이것도
+                            val_v = self.query(load_label, ":MEAS:VOLT?")
+                            val_c = self.query(load_label, ":MEAS:CURR?")
+                            val_p = self.query(load_label, ":MEAS:POW?")
                             if val_v is not None:
                                 voltage_meas = float(val_v)
                             if val_c is not None:
